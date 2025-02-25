@@ -1,3 +1,4 @@
+from typing import Union
 import warnings
 import functools
 from pathlib import Path
@@ -100,14 +101,23 @@ class CraterDatabase:
     # _loncol (str): Column name for longitude.
     # _radcol (str): Column name for radius.
     # _vesta_coord (str, optional): Coordinate system for Vesta, if applicable.
-    def __init__(self, dataset, body="Moon", units="m"):
+    def __init__(
+            self, 
+            dataset: Union[str, pd.DataFrame],
+            body: str="Moon", 
+            units: str="m"):
         """
         Initialize a CraterDatabase.
 
         Parameters:
-            filepath (str): Path to the file containing crater data.
+            dataset (str or DataFrame): 
+                if str, path to the file containing crater data.
+                if DataFrame, DataFrame containing crater data.
             body (str): Planetary body, e.g. Moon, Vesta (default: Moon)
             units (str): Length units of radius/diameter, m or km (default: m)
+
+        Raises:
+            ValueError: If dataset is not a file or DataFrame.
         """
         lon_offset = 0
         if "vesta" in body.lower():
