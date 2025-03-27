@@ -144,3 +144,19 @@ class TestCraterDatabase(unittest.TestCase):
     def test_pole_crossing(self):
         """Test annuli that cross the North or South pole."""
         pass
+
+    def test_to_geojson_basic(self):
+        """Test basic export to GeoJSON string."""
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0],
+            "name": ["Crater A", "Crater B"],
+            "_private": [1, 2]
+        })
+        cdb = CraterDatabase(df)
+        
+        geojson_str = cdb.to_geojson()
+        self.assertIsInstance(geojson_str, str)
+        self.assertIn("Crater A", geojson_str)
+        self.assertNotIn("_private", geojson_str)  # Private columns should be dropped by default
