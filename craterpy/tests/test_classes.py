@@ -174,3 +174,21 @@ class TestCraterDatabase(unittest.TestCase):
         # Export with crater rim geometries
         geojson_with_rim = cdb.to_geojson(geometry_column="rim")
         self.assertIn("Polygon", geojson_with_rim)  # Rims should be polygons not points
+
+    def test_to_geojson_with_specific_properties(self):
+        """Test export with specific property columns."""
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0],
+            "name": ["Crater A", "Crater B"],
+            "description": ["Description A", "Description B"]
+        })
+        cdb = CraterDatabase(df)
+        
+        # Export with only name property
+        props_only = cdb.to_geojson(properties=["name"])
+        self.assertIn("name", props_only)
+        self.assertIn("Crater A", props_only)
+        self.assertNotIn("description", props_only)
+        self.assertNotIn("Description A", props_only)
