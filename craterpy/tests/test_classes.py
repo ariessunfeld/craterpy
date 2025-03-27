@@ -272,3 +272,21 @@ class TestCraterDatabase(unittest.TestCase):
         import json
         geojson_obj = json.loads(geojson_with_crs)
         self.assertIn("features", geojson_obj)
+
+
+    def test_to_geojson_error_handling(self):
+        """Test error handling for invalid inputs."""
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0]
+        })
+        cdb = CraterDatabase(df)
+        
+        # Test for invalid geometry column
+        with self.assertRaises(ValueError):
+            cdb.to_geojson(geometry_column="nonexistent")
+        
+        # Test for invalid properties
+        with self.assertRaises(ValueError):
+            cdb.to_geojson(properties=["nonexistent"])
