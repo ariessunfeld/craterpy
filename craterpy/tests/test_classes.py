@@ -329,19 +329,18 @@ class TestCraterDatabase(unittest.TestCase):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
-    def test_read_shapefile_with_custom_columns(self):
+    def test_to_geojson_with_custom_columns(self):
         """Test reading a shapefile with non-standard column names."""
         # Create a GeoDataFrame with non-standard column names
-        from shapely.geometry import Point
         import geopandas as gpd
         
         gdf = gpd.GeoDataFrame({
             "latitude_deg": [0.0, 10.0],
             "longitude_deg": [0.0, 20.0],
-            "diameter_km": [2.0, 4.0],
+            "diameter_km": [2.0, 4.0],  # Diameters in km
             "crater_name": ["Crater A", "Crater B"],
             "geometry": [Point(0, 0), Point(20, 10)]
-        })
+        }, crs="EPSG:4326")
         
         import tempfile
         import os
@@ -350,24 +349,21 @@ class TestCraterDatabase(unittest.TestCase):
             tmp_path = tmp.name
         
         try:
-            # Save to file
+            # Save to file with non-standard column names
             gdf.to_file(tmp_path, driver="GeoJSON")
             
-            # Read using custom column mappings
-            # First rename columns to match expected names
-            gdf_renamed = gdf.rename(columns={
-                "latitude_deg": "lat",
-                "longitude_deg": "lon",
-                "diameter_km": "diameter"
-            })
-            gdf_renamed.to_file(tmp_path, driver="GeoJSON")
-            
-            # Read back with the renamed columns
+            # Read the file with non-standard column names
             imported_cdb = CraterDatabase.read_shapefile(tmp_path, units="km")
             
-            # Verify data was preserved
+            # Verify data was preserved and correctly interpreted
             self.assertEqual(len(imported_cdb.data), 2)
-            # Since diameter was converted to radius, check for half the values
+            
+            # Check that our read_shapefile method correctly identified the columns
+            np.testing.assert_array_almost_equal(imported_cdb.lat.values, [0.0, 10.0])
+            np.testing.assert_array_almost_equal(imported_cdb.lon.values, [0.0, 20.0])
+            
+            # Since diameter was converted to radius in km and then to meters,
+            # we expect: diameter_km / 2 * 1000 = [1000.0, 2000.0]
             np.testing.assert_array_almost_equal(imported_cdb.rad.values, [1000.0, 2000.0])
         finally:
             # Clean up

@@ -581,9 +581,6 @@ class CraterDatabase:
         If the file contains different coordinate column names than expected, this method
         will attempt to identify them by common names (e.g., 'lat', 'latitude', 'lon', 'longitude').
         """
-        import geopandas as gpd
-        
-        # Read the file using GeoPandas
         gdf = gpd.read_file(filename)
         
         # Check if the file has body or units info
@@ -595,39 +592,69 @@ class CraterDatabase:
         if 'units' in gdf.columns and gdf['units'].nunique() == 1:
             units = gdf['units'].iloc[0]
         
-        # For GeoJSON files saved with crater centers as Point geometries,
-        # extract lat/lon from the geometry
-        if not any(col in gdf.columns for col in ['lat', 'latitude', 'lon', 'longitude']):
-            # Extract coordinates from the geometry
-            if gdf.geometry.iloc[0].geom_type == 'Point':
-                gdf['lon'] = gdf.geometry.x
-                gdf['lat'] = gdf.geometry.y
+        # Create a working copy to modify
+        data = gdf.copy()
         
-        # For files created with to_geojson, ensure we have consistent names
-        if '_radius_m' in gdf.columns:
-            # File was likely created by CraterDatabase.to_geojson()
-            pass  # Already has the expected format
-        else:
-            # Try to identify common radius or diameter columns
-            # First check for radius
-            radius_col = None
-            for col_name in ['radius', 'rad', 'r_km', 'r_m', 'radius_m', 'radius_km']:
-                if col_name in gdf.columns:
-                    radius_col = col_name
+        # Try to identify latitude column
+        lat_col = None
+        lat_candidates = ['lat', 'latitude', 'latitude_deg', 'lat_deg', 'y']
+        for col in lat_candidates:
+            if col in data.columns:
+                lat_col = col
+                break
+        
+        # Try to identify longitude column
+        lon_col = None
+        lon_candidates = ['lon', 'longitude', 'longitude_deg', 'lon_deg', 'x']
+        for col in lon_candidates:
+            if col in data.columns:
+                lon_col = col
+                break
+        
+        # If lat/lon columns not found, try to extract from Point geometry
+        if (lat_col is None or lon_col is None) and all(geom.geom_type == 'Point' for geom in data.geometry):
+            data['lon'] = data.geometry.x
+            data['lat'] = data.geometry.y
+            lat_col = 'lat'
+            lon_col = 'lon'
+        
+        # If still no lat/lon, raise error
+        if lat_col is None or lon_col is None:
+            raise ValueError("Could not identify latitude and longitude columns.")
+        
+        # Standardize column names
+        data = data.rename(columns={lat_col: 'lat', lon_col: 'lon'})
+        
+        # Try to identify radius or diameter
+        radius_col = None
+        radius_candidates = ['radius', 'rad', 'r_km', 'r_m', 'radius_m', 'radius_km']
+        for col in radius_candidates:
+            if col in data.columns:
+                radius_col = col
+                break
+        
+        # If no radius, check for diameter
+        diameter_col = None
+        if radius_col is None:
+            diameter_candidates = ['diameter', 'diam', 'd_km', 'd_m', 'diameter_m', 'diameter_km']
+            for col in diameter_candidates:
+                if col in data.columns:
+                    diameter_col = col
                     break
-                    
-            # If no radius column, check for diameter
-            if radius_col is None:
-                for col_name in ['diameter', 'diam', 'd_km', 'd_m', 'diameter_m', 'diameter_km']:
-                    if col_name in gdf.columns:
-                        radius_col = col_name
-                        # Create a radius column
-                        gdf['radius'] = gdf[col_name] / 2
-                        break
-            
-            # If still no radius or diameter, raise error
-            if radius_col is None and 'radius' not in gdf.columns:
-                raise ValueError("Could not find radius or diameter column in file.")
+        
+        # Process radius or diameter
+        if radius_col:
+            data = data.rename(columns={radius_col: 'radius'})
+        elif diameter_col:
+            data['radius'] = data[diameter_col] / 2
+            # Remove original diameter column to avoid confusing the constructor
+            data = data.drop(columns=[diameter_col])
+        else:
+            # If no radius or diameter, check if '_radius_m' exists (from previous export)
+            if '_radius_m' in data.columns:
+                pass  # Already has the right format
+            else:
+                raise ValueError("Could not identify radius or diameter column.")
         
         # Create and return a new CraterDatabase instance
-        return cls(gdf, body=body, units=units)
+        return cls(data, body=body, units=units)
