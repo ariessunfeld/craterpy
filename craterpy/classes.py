@@ -475,3 +475,77 @@ class CraterDatabase:
         label = "." + name if name else ""
         ax.set_title(f"CraterDatabase{label} (N={len(self.data)})")
         return ax
+    
+    def to_geojson(
+            self, 
+            filename=None, 
+            geometry_column=None, 
+            crs=None, 
+            properties=None, 
+            drop_private=True):
+        """
+        Export the crater database to GeoJSON format.
+        
+        Parameters
+        ----------
+        filename : str, optional
+            Path to output GeoJSON file. If None, returns a string representation.
+        geometry_column : str, optional
+            Name of the geometry column to use as the active geometry. 
+            If None, uses the current active geometry.
+        crs : str or pyproj.CRS, optional
+            Target coordinate reference system. If None, uses the current CRS.
+        properties : list, optional
+            List of column names to include as properties. If None, includes all columns
+            except geometry columns.
+        drop_private : bool, optional
+            If True, drops columns with names starting with an underscore (private columns).
+            Default is True.
+            
+        Returns
+        -------
+        str or None
+            If filename is None, returns the GeoJSON string.
+            Otherwise, writes to the file and returns None.
+        """
+        # Create a copy of the data to avoid modifying the original
+        data = self.data.copy()
+        
+        # Determine which geometry column to use
+        if geometry_column is not None:
+            if geometry_column in data.columns:
+                data = data.set_geometry(geometry_column)
+            else:
+                raise ValueError(f"Geometry column '{geometry_column}' not found.")
+        
+        # Drop private columns if requested
+        if drop_private:
+            private_cols = [col for col in data.columns if col.startswith("_") and col != data.geometry.name]
+            data = data.drop(columns=private_cols)
+        
+        # Filter properties if specified
+        if properties is not None:
+            # Make sure the geometry column is included
+            geometry_name = data.geometry.name
+            keep_cols = list(set(properties + [geometry_name]))
+            missing_cols = [col for col in keep_cols if col not in data.columns]
+            if missing_cols:
+                raise ValueError(f"Properties not found: {missing_cols}")
+            data = data[keep_cols]
+        
+        # Convert to the target CRS if specified
+        if crs:
+            target_crs = CRS.from_user_input(crs)
+            if data.crs != target_crs:
+                data = data.to_crs(target_crs)
+        
+        # Export to GeoJSON
+        if filename is not None:
+            data.to_file(filename, driver="GeoJSON")
+            return None
+        else:
+            # Return as string - write to a buffer
+            import io
+            buffer = io.StringIO()
+            data.to_file(buffer, driver="GeoJSON")
+            return buffer.getvalue()
