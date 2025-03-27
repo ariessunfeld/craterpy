@@ -192,3 +192,23 @@ class TestCraterDatabase(unittest.TestCase):
         self.assertIn("Crater A", props_only)
         self.assertNotIn("description", props_only)
         self.assertNotIn("Description A", props_only)
+
+    def test_to_geojson_with_private_columns(self):
+        """Test export including private columns."""
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0],
+            "_private": [1, 2],
+            "_internal": ["x", "y"]
+        })
+        cdb = CraterDatabase(df)
+        
+        # By default, private columns should be dropped
+        default_export = cdb.to_geojson()
+        self.assertNotIn("_private", default_export)
+        
+        # With drop_private=False, they should be included
+        with_private = cdb.to_geojson(drop_private=False)
+        self.assertIn("_private", with_private)
+        self.assertIn("_internal", with_private)
