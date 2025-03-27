@@ -534,10 +534,14 @@ class CraterDatabase:
             data = data[keep_cols]
         
         # Convert to the target CRS if specified
-        if crs:
-            target_crs = CRS.from_user_input(crs)
-            if data.crs != target_crs:
-                data = data.to_crs(target_crs)
+        if crs is not None:
+            # Handle various input types for CRS
+            try:
+                target_crs = CRS.from_user_input(crs)
+                if data.crs != target_crs:
+                    data = data.to_crs(target_crs)
+            except Exception as e:
+                raise ValueError(f"Error converting to CRS '{crs}': {str(e)}")
         
         # Export to GeoJSON
         if filename is not None:
