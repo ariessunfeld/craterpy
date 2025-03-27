@@ -212,3 +212,39 @@ class TestCraterDatabase(unittest.TestCase):
         with_private = cdb.to_geojson(drop_private=False)
         self.assertIn("_private", with_private)
         self.assertIn("_internal", with_private)
+
+    def test_to_geojson_file_export(self):
+        """Test export to a GeoJSON file."""
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0],
+            "name": ["Crater A", "Crater B"]
+        })
+        cdb = CraterDatabase(df)
+        
+        import tempfile
+        import os
+        import json
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(suffix='.geojson', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            # Export to the temp file
+            result = cdb.to_geojson(filename=tmp_path)
+            self.assertIsNone(result)  # Should return None when saving to file
+            
+            # Verify the file exists and contains valid GeoJSON
+            self.assertTrue(os.path.exists(tmp_path))
+            with open(tmp_path, 'r') as f:
+                geojson_data = json.load(f)
+                self.assertEqual(len(geojson_data['features']), 2)
+                features = geojson_data['features']
+                properties = [feature['properties'] for feature in features]
+                self.assertTrue(any(prop.get('name') == "Crater A" for prop in properties))
+        finally:
+            # Clean up
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
