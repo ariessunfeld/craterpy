@@ -5,6 +5,7 @@ from pathlib import Path
 import unittest
 import pyproj
 import pandas as pd
+import numpy as np
 import shapely
 from shapely.testing import assert_geometries_equal
 from shapely.geometry import Point
@@ -290,3 +291,40 @@ class TestCraterDatabase(unittest.TestCase):
         # Test for invalid properties
         with self.assertRaises(ValueError):
             cdb.to_geojson(properties=["nonexistent"])
+
+    def test_read_shapefile_basic(self):
+        """Test basic reading of a shapefile from a GeoJSON file."""
+        # Create a simple CraterDatabase
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0],
+            "name": ["Crater A", "Crater B"]
+        })
+        original_cdb = CraterDatabase(df)
+        
+        # Write to GeoJSON
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(suffix='.geojson', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        try:
+            # Save to file
+            original_cdb.to_geojson(filename=tmp_path)
+            
+            # Read back the file
+            imported_cdb = CraterDatabase.read_shapefile(tmp_path)
+            
+            # Verify data was preserved
+            self.assertEqual(len(imported_cdb.data), len(original_cdb.data))
+            self.assertEqual(imported_cdb.data.shape[0], 2)
+            # Check key attributes
+            np.testing.assert_array_almost_equal(imported_cdb.lat.values, original_cdb.lat.values)
+            np.testing.assert_array_almost_equal(imported_cdb.lon.values, original_cdb.lon.values)
+            np.testing.assert_array_almost_equal(imported_cdb.rad.values, original_cdb.rad.values)
+        finally:
+            # Clean up
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)

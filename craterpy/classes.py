@@ -550,3 +550,84 @@ class CraterDatabase:
         else:
             # Return as string
             return data.to_json()
+
+
+    @classmethod
+    def read_shapefile(cls, filename, body="Moon", units="m"):
+        """
+        Read crater data from a shapefile or GeoJSON file.
+        
+        Parameters
+        ----------
+        filename : str
+            Path to the shapefile or GeoJSON file.
+        body : str, optional
+            Planetary body, e.g. Moon, Vesta (default: Moon).
+            If the file contains a 'body' or 'planet' field, that value will be used instead.
+        units : str, optional
+            Length units of radius/diameter, m or km (default: m).
+            If the file contains a 'units' field, that value will be used instead.
+        
+        Returns
+        -------
+        CraterDatabase
+            A new CraterDatabase instance containing the data from the file.
+            
+        Notes
+        -----
+        This method assumes the file was previously created by CraterDatabase.to_geojson()
+        or has a compatible format with lat/lon coordinates and radius or diameter information.
+        
+        If the file contains different coordinate column names than expected, this method
+        will attempt to identify them by common names (e.g., 'lat', 'latitude', 'lon', 'longitude').
+        """
+        import geopandas as gpd
+        
+        # Read the file using GeoPandas
+        gdf = gpd.read_file(filename)
+        
+        # Check if the file has body or units info
+        if 'body' in gdf.columns and gdf['body'].nunique() == 1:
+            body = gdf['body'].iloc[0]
+        elif 'planet' in gdf.columns and gdf['planet'].nunique() == 1:
+            body = gdf['planet'].iloc[0]
+            
+        if 'units' in gdf.columns and gdf['units'].nunique() == 1:
+            units = gdf['units'].iloc[0]
+        
+        # For GeoJSON files saved with crater centers as Point geometries,
+        # extract lat/lon from the geometry
+        if not any(col in gdf.columns for col in ['lat', 'latitude', 'lon', 'longitude']):
+            # Extract coordinates from the geometry
+            if gdf.geometry.iloc[0].geom_type == 'Point':
+                gdf['lon'] = gdf.geometry.x
+                gdf['lat'] = gdf.geometry.y
+        
+        # For files created with to_geojson, ensure we have consistent names
+        if '_radius_m' in gdf.columns:
+            # File was likely created by CraterDatabase.to_geojson()
+            pass  # Already has the expected format
+        else:
+            # Try to identify common radius or diameter columns
+            # First check for radius
+            radius_col = None
+            for col_name in ['radius', 'rad', 'r_km', 'r_m', 'radius_m', 'radius_km']:
+                if col_name in gdf.columns:
+                    radius_col = col_name
+                    break
+                    
+            # If no radius column, check for diameter
+            if radius_col is None:
+                for col_name in ['diameter', 'diam', 'd_km', 'd_m', 'diameter_m', 'diameter_km']:
+                    if col_name in gdf.columns:
+                        radius_col = col_name
+                        # Create a radius column
+                        gdf['radius'] = gdf[col_name] / 2
+                        break
+            
+            # If still no radius or diameter, raise error
+            if radius_col is None and 'radius' not in gdf.columns:
+                raise ValueError("Could not find radius or diameter column in file.")
+        
+        # Create and return a new CraterDatabase instance
+        return cls(gdf, body=body, units=units)
