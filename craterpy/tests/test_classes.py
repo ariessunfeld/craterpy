@@ -160,3 +160,17 @@ class TestCraterDatabase(unittest.TestCase):
         self.assertIsInstance(geojson_str, str)
         self.assertIn("Crater A", geojson_str)
         self.assertNotIn("_private", geojson_str)  # Private columns should be dropped by default
+
+    def test_to_geojson_with_custom_geometry(self):
+        """Test export with a custom geometry column."""
+        df = pd.DataFrame({
+            "lat": [0.0, 10.0], 
+            "lon": [0.0, 20.0], 
+            "radius": [1.0, 2.0]
+        })
+        cdb = CraterDatabase(df)
+        cdb.add_circles("rim")
+        
+        # Export with crater rim geometries
+        geojson_with_rim = cdb.to_geojson(geometry_column="rim")
+        self.assertIn("Polygon", geojson_with_rim)  # Rims should be polygons not points
