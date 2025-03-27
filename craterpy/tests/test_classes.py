@@ -61,7 +61,7 @@ class TestCraterDatabase(unittest.TestCase):
             "radius": [1.0, 2.0]
         })
         cdb = CraterDatabase(df)
-        cdb.add_annuli(0, 1, "test_annulus")
+        cdb.add_annuli("test_annulus", 0, 1)
         # Generate the plot.
         ax = cdb.plot()
         self.assertIsNotNone(ax)
