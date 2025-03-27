@@ -544,8 +544,5 @@ class CraterDatabase:
             data.to_file(filename, driver="GeoJSON")
             return None
         else:
-            # Return as string - write to a buffer
-            import io
-            buffer = io.StringIO()
-            data.to_file(buffer, driver="GeoJSON")
-            return buffer.getvalue()
+            # Return as string
+            return data.to_json()
